@@ -22,7 +22,7 @@ class SessionService {
                 userId,
             },
             process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: "1h" }
+            { expiresIn: "1s" }
         )
         const refreshToken = await jwt.sign(
             {
@@ -68,7 +68,7 @@ class SessionService {
                 userId,
             },
             process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: "1h" }
+            { expiresIn: "1s" }
         )
         const refreshToken = await jwt.sign(
             {
@@ -96,6 +96,7 @@ class SessionService {
     }
 
     static async verifySession(ip, userId, code) {
+        console.log(ip, userId, code)
         if (!ip || !userId || !code)
             throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
         const session = await Session.findOne({ user: userId, ip })
@@ -127,6 +128,7 @@ class SessionService {
             throw ApiError.unauthorized("TOKEN NOT ALLOWED!")
         }
 
+        console.log(session.familyId == decoded.familyId, decoded.ip, session.ip, ip)
         if (session.familyId != decoded.familyId || decoded.ip != session.ip || session.ip != ip)
             throw ApiError.unauthorized("TOKEN NOT ALLOWED!")
 
@@ -153,6 +155,8 @@ class SessionService {
         }
 
         if (!refreshed) return { accessToken, refreshToken, sessionId }
+        console.log(session.familyId)
+        console.log(decoded2.familyId)
         if (session.familyId != decoded2.familyId || decoded2.ip != session.ip || ip != session.ip)
             throw ApiError.unauthorized("TOKEN NOT ALLOWED!")
 
@@ -229,23 +233,15 @@ class SessionService {
         if (!sessionId) throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
         const session = await Session.findById(sessionId)
         if (!session || !session.isVerified) throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
-        const user = await User.findById(session?.id)
+        const user = await User.findById(session?.user)
         if (!user) {
             session.deleteOne()
             throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
         }
 
         const allSessions = await Session.find({ user: user.id })
-        const allSessionsAllowed = allSessions.map((el) => {
-            return {
-                ip: el.ip,
-                verified: el.isVerified,
-                connected: el.connected,
-                lastConnect: el.lastConnect,
-            }
-        })
 
-        return allSessionsAllowed
+        return this.getAllAllowedInfo(allSessions)
     }
     static async closeSession(sessionId, userId) {
         if (!sessionId) throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
@@ -254,7 +250,21 @@ class SessionService {
         if (session.user != userId)
             throw ApiError.badrequest("THIS SESSION NOT ALLOWED TO CLOSE!", "THIS SESSION NOT ALLOWED TO CLOSE!")
 
+        await session.deleteOne()
+
         return true
+    }
+    static getAllAllowedInfo(sessionModels) {
+        return sessionModels.map((el) => {
+            return {
+                id: el._id,
+                ip: el.ip,
+                verified: el.isVerified,
+                connected: el.connected,
+                lastConnect: el.lastConnect,
+                userAgent: el.userAgent,
+            }
+        })
     }
 }
 

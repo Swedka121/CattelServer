@@ -9,11 +9,11 @@ const schema = new mongoose.Schema({
     userAgent: { type: String, required: true, max: 512 },
     timestamp: { type: Date, default: Date.now() },
     isVerified: { type: Boolean, default: false },
-    verifyCode: { type: String, unique: true },
+    verifyCode: { type: String },
     socketid: { type: String, default: null },
-    socketConnectCode: { type: String, unique: true },
+    socketConnectCode: { type: String },
     connected: { type: Boolean, default: false },
     lastConnect: { type: Date, default: Date.now() },
 })
-
+// mongoose.deleteModel("Session")
 module.exports = mongoose.model("Session", schema)
