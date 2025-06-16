@@ -27,7 +27,6 @@ app.use(
 app.use("/api/v0", router)
 
 app.use((err, req, res, next) => {
-    console.log(err)
     if (err instanceof ApiError) return res.status(err.code).json({ message: err.message_client })
     if (err.code && err.code == 11000) return res.status(400).json({ message: "Duplicate data!" })
     res.status(500).json({ message: "Oops! Something went wrong." })

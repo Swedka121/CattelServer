@@ -195,9 +195,9 @@ class SessionService {
 
         const token = genFamilyId()
         session.socketConnectCode = token
+        await session.save()
 
         const jwt_ = jwt.sign({ code: token, sessionId }, process.env.WEBSOCKET_TOKEN_SECRET, { expiresIn: "2m" })
-        await session.save()
 
         return jwt_
     }
@@ -207,6 +207,7 @@ class SessionService {
 
         const session = await Session.findById(decode.sessionId)
         if (!session || !session.isVerified) throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
+        console.log(session.socketConnectCode, decode.code)
         if (session.socketConnectCode != decode.code) throw ApiError.unauthorized("TOKEN NOT ALLOWED!")
 
         session.lastConnect = Date.now()
