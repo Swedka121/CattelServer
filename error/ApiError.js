@@ -17,6 +17,9 @@ class ApiError extends Error {
     static forbidden(message_log) {
         return new ApiError(message_log, "FORBIDDEN!", 401)
     }
+    static rpu() {
+        return ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+    }
 }
 
 module.exports = ApiError

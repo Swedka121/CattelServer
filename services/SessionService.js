@@ -4,11 +4,11 @@ const jwt = require("jsonwebtoken")
 const MailService = require("./MailService")
 const User = require("../models/User")
 const ApiError = require("../error/ApiError")
+const NotifyService = require("./NotifyService")
 
 class SessionService {
     static async registerNew(ip, userAgent, userId) {
-        if (!ip || !userId || !userAgent)
-            throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+        if (!ip || !userId || !userAgent) throw ApiError.rpu()
         const user = await User.findById(userId)
         if (!user) throw ApiError.badrequest("USER FOR SESSION CREATE UNDEFINED!", "USER FOR SESSION CREATE UNDEFINED!")
 
@@ -22,7 +22,7 @@ class SessionService {
                 userId,
             },
             process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: "1s" }
+            { expiresIn: "1h" }
         )
         const refreshToken = await jwt.sign(
             {
@@ -54,7 +54,7 @@ class SessionService {
     }
 
     static async createSessionWitoutVerify(ip, userAgent, userId) {
-        if (!ip || !userId) throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+        if (!ip || !userId) throw ApiError.rpu()
         const user = await User.findById(userId)
         if (!user) throw ApiError.badrequest("USER FOR SESSION CREATE UNDEFINED!", "USER FOR SESSION CREATE UNDEFINED!")
 
@@ -68,7 +68,7 @@ class SessionService {
                 userId,
             },
             process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: "1s" }
+            { expiresIn: "1h" }
         )
         const refreshToken = await jwt.sign(
             {
@@ -92,27 +92,28 @@ class SessionService {
         })
 
         await session.save()
+        await NotifyService.systemNotify(
+            userId,
+            "Hey there, curious cat! 🐱 Welcome to Cattel — your cozy corner to chat, chill, and connect."
+        )
         return { accessToken: session.accessToken, refreshToken: session.refreshToken, sessionId: session.id }
     }
 
     static async verifySession(ip, userId, code) {
-        console.log(ip, userId, code)
-        if (!ip || !userId || !code)
-            throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+        if (!ip || !userId || !code) throw ApiError.rpu()
         const session = await Session.findOne({ user: userId, ip })
         const user = await User.findById(userId)
         if (!session || !user) throw ApiError.badrequest("SESSION TO VERIFY UNDEFINED!", "SESSION TO VERIFY UNDEFINED!")
-
-        console.log(session.verifyCode, code, session.verifyCode == code)
 
         if (session.verifyCode != code) throw ApiError.badrequest("VERIFY CODE IS WRONG!", "VERIFY CODE IS WRONG!")
         session.verifyCode = null
         session.isVerified = true
 
         await session.save()
-
-        // await MailService.sendNewLoginNotify(user.email, ip, user.username)
-
+        await NotifyService.systemNotify(
+            userId,
+            "Pawprint confirmed! 🐾\nYou’re now logged in to Cattel — your cozy digital chat spot.\nTime to stretch, scroll, and say hi.\nYou can see login info in sessions menu!"
+        )
         return { accessToken: session.accessToken, refreshToken: session.refreshToken, sessionId: session.id }
     }
 
@@ -128,7 +129,6 @@ class SessionService {
             throw ApiError.unauthorized("TOKEN NOT ALLOWED!")
         }
 
-        console.log(session.familyId == decoded.familyId, decoded.ip, session.ip, ip)
         if (session.familyId != decoded.familyId || decoded.ip != session.ip || session.ip != ip)
             throw ApiError.unauthorized("TOKEN NOT ALLOWED!")
 
@@ -136,7 +136,7 @@ class SessionService {
     }
 
     static async refreshSession(sessionId, ip, accessToken, refreshToken) {
-        console.log(sessionId, refreshToken, accessToken, ip)
+        console.log(sessionId, ip, accessToken, refreshToken)
         if (!sessionId || !ip || !accessToken || !refreshToken) throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
         const session = await Session.findById(sessionId)
         if (!session || !session.isVerified) throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
@@ -155,8 +155,7 @@ class SessionService {
         }
 
         if (!refreshed) return { accessToken, refreshToken, sessionId }
-        console.log(session.familyId)
-        console.log(decoded2.familyId)
+
         if (session.familyId != decoded2.familyId || decoded2.ip != session.ip || ip != session.ip)
             throw ApiError.unauthorized("TOKEN NOT ALLOWED!")
 
@@ -189,7 +188,7 @@ class SessionService {
         return { accessToken, refreshToken, sessionId: session.id }
     }
     static async createSocketConnect(sessionId) {
-        if (!sessionId) throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+        if (!sessionId) throw ApiError.rpu()
         const session = await Session.findById(sessionId)
         if (!session || !session.isVerified) throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
 
@@ -202,15 +201,14 @@ class SessionService {
         return jwt_
     }
     static async checkSocketConnect(token, socketid) {
-        if (!token) throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+        if (!token) throw ApiError.rpu()
         const decode = jwt.verify(token, process.env.WEBSOCKET_TOKEN_SECRET)
 
         const session = await Session.findById(decode.sessionId)
         if (!session || !session.isVerified) throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
-        console.log(session.socketConnectCode, decode.code)
         if (session.socketConnectCode != decode.code) throw ApiError.unauthorized("TOKEN NOT ALLOWED!")
 
-        session.lastConnect = Date.now()
+        session.lastConnect = new Date()
         session.connected = true
         session.socketid = socketid
         session.socketConnectCode = null
@@ -219,7 +217,7 @@ class SessionService {
         return true
     }
     static async disconnectSocket(socketid) {
-        if (!socketid) throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+        if (!socketid) throw ApiError.rpu()
         const session = await Session.findOne({ socketid })
         if (!session) throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
 
@@ -230,8 +228,8 @@ class SessionService {
 
         return true
     }
-    static async getAllUserSessions(sessionId) {
-        if (!sessionId) throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+    static async getAllUserSessionsBySession(sessionId) {
+        if (!sessionId) throw ApiError.rpu()
         const session = await Session.findById(sessionId)
         if (!session || !session.isVerified) throw ApiError.unauthorized("ACTIVE SESSION UNDEFINED!")
         const user = await User.findById(session?.user)
@@ -244,8 +242,14 @@ class SessionService {
 
         return this.getAllAllowedInfo(allSessions)
     }
+    static async getAllUserSessionsByUserId(userId) {
+        if (!userId) throw ApiError.rpu()
+        const allSessions = await Session.find({ user: userId })
+
+        return this.getAllAllowedInfo(allSessions)
+    }
     static async closeSession(sessionId, userId) {
-        if (!sessionId) throw ApiError.badrequest("REQUIRED PARAMS UNDEFINED!", "REQUIRED PARAMS UNDEFINED!")
+        if (!sessionId) throw ApiError.rpu()
         const session = await Session.findById(sessionId)
 
         if (session.user != userId)
@@ -260,6 +264,7 @@ class SessionService {
             return {
                 id: el._id,
                 ip: el.ip,
+                socketId: el.socketid,
                 verified: el.isVerified,
                 connected: el.connected,
                 lastConnect: el.lastConnect,

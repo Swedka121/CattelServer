@@ -16,11 +16,7 @@ class UserController {
         const ip = req.header_ip
         const userAgent = req.userAgent
 
-        console.log(req.header_ip, req.userAgent)
-
         const res_ = await UserService.login(username, password, ip, userAgent)
-
-        console.log(res_)
 
         res.status(200).json({ data: res_ })
     }
@@ -46,6 +42,8 @@ class UserController {
         const { accessToken, sessionId, refreshToken } = req.body
         const ip = req.header_ip
 
+        console.log(accessToken, refreshToken, sessionId)
+
         const res_ = await SessionService.refreshSession(sessionId, ip, accessToken, refreshToken)
 
         res.json({ data: res_ }).status(200)
@@ -68,7 +66,7 @@ class UserController {
     static async getAllSessions(req, res, next) {
         const session = req.session
 
-        const sessions = await SessionService.getAllUserSessions(session.id)
+        const sessions = await SessionService.getAllUserSessionsBySession(session.id)
 
         res.json({ data: sessions }).status(200)
     }

@@ -13,6 +13,13 @@ const mongoose = require("mongoose")
 const userDataMiddleware = require("./middleware/userDataMiddleware")
 const checkValidation = require("./middleware/checkValidation")
 
+const User = require("./models/User")
+const Session = require("./models/Session")
+const Chat = require("./models/Chat")
+const Message = require("./models/Message")
+const Notify = require("./models/Notify")
+const NotifyService = require("./services/NotifyService")
+
 app.use(checkValidation)
 app.use(userDataMiddleware)
 app.use(express.json())
@@ -27,6 +34,7 @@ app.use(
 app.use("/api/v0", router)
 
 app.use((err, req, res, next) => {
+    console.log(err)
     if (err instanceof ApiError) return res.status(err.code).json({ message: err.message_client })
     if (err.code && err.code == 11000) return res.status(400).json({ message: "Duplicate data!" })
     res.status(500).json({ message: "Oops! Something went wrong." })
@@ -51,5 +59,6 @@ connectDB()
 
 app.listen(3000, async () => {
     console.log("app server listening on port 3000")
+    // await NotifyService.systemNotify("684860f9b8682007d2a39fba", "Hello")
     // await MailService.sendVerifyUserMessage("ivan.hryshchuk2011@gmail.com", 655553, "swedka121")
 })
